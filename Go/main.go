@@ -1,5 +1,3 @@
-// add timer
-// add loop through subFields
 // add go in jupyther
 
 package main
@@ -11,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
+	// "github.com/cheggaaa/pb/v3"
 )
 
 func GenerateCSV(fileName string) {
@@ -73,7 +73,9 @@ func get_comments_from_file(pathBNCFile string) string {
 }
 
 func run() ([]string, error) {
-	searchDir := "/home/r3s2/Documents/BNCGoLang/"
+
+	logFileName := "BNC.csv"
+	searchDir := "/home/r3s2/Documents/BNC/"
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
@@ -85,20 +87,28 @@ func run() ([]string, error) {
 		panic(e)
 	}
 
-	GenerateCSV("actif.csv")
+	// bar := pb.StartNew(fileList)
+
+	GenerateCSV(logFileName)
 	for _, BNCPath := range fileList {
+		// bar.Increment()
 		// we filter only the .BNC files.
 		if ".BNC" == filepath.Ext(BNCPath) {
 			// code extract
 			commentsFromFab := get_comments_from_file(BNCPath)
 			BNCFileName := filepath.Base(BNCPath)
-			AppendCSV("actif.csv", BNCPath, BNCFileName, commentsFromFab)
+			AppendCSV(logFileName, BNCPath, BNCFileName, commentsFromFab)
 		}
 	}
 
+	// bar.Finish()
 	return fileList, nil
 }
 
 func main() {
+	start := time.Now()
 	run()
+	elapsed := time.Since(start)
+	log.Printf("BNC files scraping took %s", elapsed)
+	log.Printf("BNC.csv created.")
 }
