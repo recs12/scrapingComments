@@ -14,7 +14,7 @@ import (
 )
 
 func GenerateCSV(fileName string) {
-	err := ioutil.WriteFile(fileName, []byte("Path; FileName; Comments;\n"), 0644)
+	err := ioutil.WriteFile(fileName, []byte("Path, FileName, Comments,\n"), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func AppendCSV(fileName, path, name, comments string) {
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + "; " + name + "; " + comments + ";\n"); err != nil {
+	if _, err := file.WriteString(path + ", " + name + ", " + comments + ",\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -48,7 +48,8 @@ func get_comments_from_file(pathBNCFile string) string {
 	//Get content of the BNCPath
 	content, err := ioutil.ReadFile(pathBNCFile)
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
+		return "UNEXPECTED ERROR"
 	}
 
 	// Convert []byte to string and print to screen
@@ -69,14 +70,17 @@ func get_comments_from_file(pathBNCFile string) string {
 
 	// split to array
 	fieldsSequence := strings.Split(res, ",")
-	return strings.TrimSpace(fieldsSequence[9])
+	comment := strings.TrimSpace(fieldsSequence[11])
+	return comment
 }
 
 func run() ([]string, error) {
 
 	logFileName := "BNC.csv"
-	searchDir := "/home/r3s2/Documents/BNC/"
-
+	// searchDir := "/home/r3s2/Documents/BNC/"
+	// searchDir := "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\BNC\\"
+	searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
+	
 	fileList := make([]string, 0)
 	e := filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
 		fileList = append(fileList, path)
