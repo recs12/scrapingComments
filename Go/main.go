@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -45,19 +46,20 @@ func get_content_between_(content, starting, ending string) string {
 }
 
 func get_comments_from_file(pathBNCFile string) string {
+
+	fmt.Println(pathBNCFile)
 	//Get content of the BNCPath
 	content, err := ioutil.ReadFile(pathBNCFile)
 	if err != nil {
-		// log.Fatal(err)
-		return "UNEXPECTED ERROR"
+		log.Fatal(err)
 	}
 
 	// Convert []byte to string and print to screen
 	textfromBNC := string(content)
 	biegeteilstamm := get_content_between_(textfromBNC, "BEGIN_BIEGETEILSTAMM", "ENDE_BIEGETEILSTAMM")
-	fields := get_content_between_(biegeteilstamm, `ZA,DA,1`, `C`)
-	subFields := get_content_between_(fields, `DA,`, `C`)
-
+	fields := get_content_between_(biegeteilstamm, "ZA,DA,1", "C")
+	subFields := get_content_between_(fields, "DA,", `\z`) // \z => end of the file
+	fmt.Println(subFields)
 	//CARRIAGES:
 	regx := regexp.MustCompile("\n")
 	fieldswhitoutCarriage := regx.ReplaceAllString(subFields, "")
@@ -70,17 +72,24 @@ func get_comments_from_file(pathBNCFile string) string {
 
 	// split to array
 	fieldsSequence := strings.Split(res, ",")
+
 	comment := strings.TrimSpace(fieldsSequence[11])
+
 	return comment
 }
 
 func run() ([]string, error) {
 
 	logFileName := "BNC.csv"
-	// searchDir := "/home/r3s2/Documents/BNC/"
+
+	// Linux machine.
+	searchDir := "/home/r3s2/Documents/BNC/"
+
+	//RDL machine.
 	// searchDir := "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\BNC\\"
-	searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
-	
+	//Brenna machine
+	// searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
+
 	fileList := make([]string, 0)
 	e := filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
 		fileList = append(fileList, path)
@@ -111,7 +120,7 @@ func run() ([]string, error) {
 
 func main() {
 	start := time.Now()
-	run()
+	go run()
 	elapsed := time.Since(start)
 	log.Printf("BNC files scraping took %s", elapsed)
 	log.Printf("BNC.csv created.")
