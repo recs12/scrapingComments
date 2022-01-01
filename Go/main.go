@@ -3,15 +3,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
-	// "github.com/cheggaaa/pb/v3"
 )
 
 func GenerateCSV(fileName string) {
@@ -21,7 +22,7 @@ func GenerateCSV(fileName string) {
 	}
 }
 
-func AppendCSV(fileName, path, name, comments string) {
+func AppendCSV(fileName, path, comments string) {
 	//Append second line
 	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -29,7 +30,7 @@ func AppendCSV(fileName, path, name, comments string) {
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + ", " + name + ", " + comments + ",\n"); err != nil {
+	if _, err := file.WriteString(path + ", " + comments + ",\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -45,7 +46,7 @@ func get_content_between_(content, starting, ending string) string {
 	return modified_content
 }
 
-func get_comments_from_file(pathBNCFile string) string {
+func get_comments_from_file(pathBNCFile string) (string, error) {
 
 	fmt.Println(pathBNCFile)
 	//Get content of the BNCPath
@@ -74,8 +75,11 @@ func get_comments_from_file(pathBNCFile string) string {
 	fieldsSequence := strings.Split(res, ",")
 
 	comment := strings.TrimSpace(fieldsSequence[11])
-
-	return comment
+	if reflect.TypeOf(comment).Kind() == reflect.String {
+		return comment, nil
+	} else {
+		return "READING ERROR", errors.New("reading error")
+	}
 }
 
 func run() ([]string, error) {
@@ -100,17 +104,18 @@ func run() ([]string, error) {
 		panic(e)
 	}
 
-	// bar := pb.StartNew(fileList)
-
 	GenerateCSV(logFileName)
 	for _, BNCPath := range fileList {
-		// bar.Increment()
+
 		// we filter only the .BNC files.
 		if ".BNC" == filepath.Ext(BNCPath) {
 			// code extract
-			commentsFromFab := get_comments_from_file(BNCPath)
-			BNCFileName := filepath.Base(BNCPath)
-			AppendCSV(logFileName, BNCPath, BNCFileName, commentsFromFab)
+			commentsFromFab, errFab := get_comments_from_file(BNCPath)
+			if errFab != nil {
+				AppendCSV(logFileName, BNCPath, commentsFromFab)
+			} else {
+				AppendCSV(logFileName, BNCPath, "READING ERROR")
+			}
 		}
 	}
 
@@ -120,7 +125,7 @@ func run() ([]string, error) {
 
 func main() {
 	start := time.Now()
-	go run()
+	run()
 	elapsed := time.Since(start)
 	log.Printf("BNC files scraping took %s", elapsed)
 	log.Printf("BNC.csv created.")
