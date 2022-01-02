@@ -1,5 +1,3 @@
-// add go in jupyther
-
 package main
 
 import (
@@ -9,21 +7,21 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
 )
 
 func GenerateCSV(fileName string) {
-	err := ioutil.WriteFile(fileName, []byte("Path, FileName, Comments,\n"), 0644)
+	// Create a csv file in the same location of the script.
+	err := ioutil.WriteFile(fileName, []byte("Path, Comments,\n"), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 func AppendCSV(fileName, path, comments string) {
-	//Append second line
+
 	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println(err)
@@ -59,8 +57,8 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 	textfromBNC := string(content)
 	biegeteilstamm := get_content_between_(textfromBNC, "BEGIN_BIEGETEILSTAMM", "ENDE_BIEGETEILSTAMM")
 	fields := get_content_between_(biegeteilstamm, "ZA,DA,1", "C")
-	subFields := get_content_between_(fields, "DA,", `\z`) // \z => end of the file
-	fmt.Println(subFields)
+	subFields := get_content_between_(fields, "DA,", `\z`) // from DA to the end of the file.
+
 	//CARRIAGES:
 	regx := regexp.MustCompile("\n")
 	fieldswhitoutCarriage := regx.ReplaceAllString(subFields, "")
@@ -68,15 +66,13 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 	//ASTERISK
 	fieldsWithoutAsteriks := strings.Replace(fieldswhitoutCarriage, "*", "", -1)
 
-	//REMOVE THE GUIMMET
+	//REMOVE THE QUOTATION MARKS
 	res := strings.ReplaceAll(fieldsWithoutAsteriks, "'", "")
 
-	// split to array
+	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(res, ",")
-
-	comment := strings.TrimSpace(fieldsSequence[11])
-	if reflect.TypeOf(comment).Kind() == reflect.String {
-		return comment, nil
+	if len(fieldsSequence) == 25 {
+		return strings.TrimSpace(fieldsSequence[11]), nil
 	} else {
 		return "READING ERROR", errors.New("reading error")
 	}
@@ -86,12 +82,12 @@ func run() ([]string, error) {
 
 	logFileName := "BNC.csv"
 
-	// Linux machine.
+	// Linux machine:
 	searchDir := "/home/r3s2/Documents/BNC/"
 
-	//RDL machine.
+	//RDL machine:
 	// searchDir := "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\BNC\\"
-	//Brenna machine
+	//Windows machine:
 	// searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
 
 	fileList := make([]string, 0)
@@ -109,9 +105,10 @@ func run() ([]string, error) {
 
 		// we filter only the .BNC files.
 		if ".BNC" == filepath.Ext(BNCPath) {
-			// code extract
-			commentsFromFab, errFab := get_comments_from_file(BNCPath)
-			if errFab != nil {
+
+			commentsFromFab, errScraping := get_comments_from_file(BNCPath)
+
+			if errScraping == nil {
 				AppendCSV(logFileName, BNCPath, commentsFromFab)
 			} else {
 				AppendCSV(logFileName, BNCPath, "READING ERROR")
@@ -119,7 +116,6 @@ func run() ([]string, error) {
 		}
 	}
 
-	// bar.Finish()
 	return fileList, nil
 }
 
