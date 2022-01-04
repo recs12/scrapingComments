@@ -14,7 +14,7 @@ import (
 
 func GenerateCSV(fileName string) {
 	// Create a csv file in the same location of the script.
-	err := ioutil.WriteFile(fileName, []byte("Path, Comments,\n"), 0644)
+	err := ioutil.WriteFile(fileName, []byte("Path, number_of_bends,\n"), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(res, ",")
 	if len(fieldsSequence) == 25 {
-		return strings.TrimSpace(fieldsSequence[11]), nil
+		return strings.TrimSpace(fieldsSequence[18]), nil
 	} else {
 		return "READING ERROR", errors.New("reading error")
 	}
@@ -88,8 +88,8 @@ func run() ([]string, error) {
 	//RDL machine:
 	// searchDir := "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\BNC\\"
 	//Windows machine:
-	searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
-	// searchDir := "C:\\Users\\recs\\Documents\\ARCHIVE"
+	// searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
+	searchDir := "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 
 
