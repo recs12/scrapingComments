@@ -83,12 +83,15 @@ func run() ([]string, error) {
 	logFileName := "BNC.csv"
 
 	// Linux machine:
-	searchDir := "/home/r3s2/Documents/BNC/"
+	// searchDir := "/home/r3s2/Documents/BNC/"
 
 	//RDL machine:
 	// searchDir := "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\BNC\\"
 	//Windows machine:
-	// searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
+	searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
+	// searchDir := "C:\\Users\\recs\\Documents\\ARCHIVE"
+
+
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
