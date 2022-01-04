@@ -14,13 +14,13 @@ import (
 
 func GenerateCSV(fileName string) {
 	// Create a csv file in the same location of the script.
-	err := ioutil.WriteFile(fileName, []byte("Path, Kommentar,\n"), 0644)
+	err := ioutil.WriteFile(fileName, []byte("path, part_id, number_bends,\n"), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func AppendCSV(fileName, path, comments string) {
+func AppendCSV(fileName, path, id, comments string) {
 
 	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -28,7 +28,7 @@ func AppendCSV(fileName, path, comments string) {
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + ", " + comments + ",\n"); err != nil {
+	if _, err := file.WriteString(path + ", " + id + ", " + comments + ",\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -82,6 +82,10 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 	}
 }
 
+func fileNameWithoutExtTrimSuffix(fileName string) string {
+	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
+}
+
 func run() ([]string, error) {
 
 	logFileName := "BNC.csv"
@@ -109,12 +113,14 @@ func run() ([]string, error) {
 		// we filter only the .BNC files.
 		if ".BNC" == filepath.Ext(BNCPath) {
 
+			id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
+
 			commentsFromFab, errScraping := get_comments_from_file(BNCPath)
 
 			if errScraping == nil {
-				AppendCSV(logFileName, BNCPath, commentsFromFab)
+				AppendCSV(logFileName, BNCPath, id, commentsFromFab)
 			} else {
-				AppendCSV(logFileName, BNCPath, "READING ERROR")
+				AppendCSV(logFileName, BNCPath, id, "READING ERROR")
 			}
 		}
 	}
