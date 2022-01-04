@@ -14,13 +14,13 @@ import (
 
 func GenerateCSV(fileName string) {
 	// Create a csv file in the same location of the script.
-	err := ioutil.WriteFile(fileName, []byte("Path, Comments,\n"), 0644)
+	err := ioutil.WriteFile(fileName, []byte("path, part_id, number_bends,\n"), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func AppendCSV(fileName, path, comments string) {
+func AppendCSV(fileName, path, id, comments string) {
 
 	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -28,21 +28,25 @@ func AppendCSV(fileName, path, comments string) {
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + ", " + comments + ",\n"); err != nil {
+	if _, err := file.WriteString(path + ", " + id + ", " + comments + ",\n"); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func get_content_between_(content, starting, ending string) string {
+func get_content_between_(content string, regx regexp.Regexp) string {
 
 	var modified_content string = ""
-	regx := regexp.MustCompile(starting + `([^"]*)` + ending)
+	// regx := regexp.MustCompile(starting + `([^"]*)` + ending)
 	matches := regx.FindAllStringSubmatch(content, -1)
 	for _, v := range matches {
 		modified_content = modified_content + v[1]
 	}
 	return modified_content
 }
+
+var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `([^"]*)` + "ENDE_BIEGETEILSTAMM")
+var TagsFields *regexp.Regexp = regexp.MustCompile("ZA,DA,1" + `([^"]*)` + "C")
+var TagsSubFields *regexp.Regexp = regexp.MustCompile("DA," + `([^"]*)` + `\z`) // from DA to the end of the file.
 
 func get_comments_from_file(pathBNCFile string) (string, error) {
 
@@ -55,9 +59,9 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 
 	// Convert []byte to string and print to screen
 	textfromBNC := string(content)
-	biegeteilstamm := get_content_between_(textfromBNC, "BEGIN_BIEGETEILSTAMM", "ENDE_BIEGETEILSTAMM")
-	fields := get_content_between_(biegeteilstamm, "ZA,DA,1", "C")
-	subFields := get_content_between_(fields, "DA,", `\z`) // from DA to the end of the file.
+	biegeteilstamm := get_content_between_(textfromBNC, *TagsRegx)
+	fields := get_content_between_(biegeteilstamm, *TagsFields)
+	subFields := get_content_between_(fields, *TagsSubFields)
 
 	//CARRIAGES:
 	regx := regexp.MustCompile("\n")
@@ -71,11 +75,15 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 
 	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(res, ",")
-	if len(fieldsSequence) == 25 {
+	if len(fieldsSequence) > 11 {
 		return strings.TrimSpace(fieldsSequence[11]), nil
 	} else {
 		return "READING ERROR", errors.New("reading error")
 	}
+}
+
+func fileNameWithoutExtTrimSuffix(fileName string) string {
+	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
 }
 
 func run() ([]string, error) {
@@ -83,12 +91,11 @@ func run() ([]string, error) {
 	logFileName := "BNC.csv"
 
 	// Linux machine:
-	searchDir := "/home/r3s2/Documents/BNC/"
+	// searchDir := "/home/r3s2/Documents/BNC/"
 
-	//RDL machine:
-	// searchDir := "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\BNC\\"
 	//Windows machine:
 	// searchDir := "C:\\Users\\recs\\Documents\\ACTIF"
+	searchDir := "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
@@ -106,12 +113,14 @@ func run() ([]string, error) {
 		// we filter only the .BNC files.
 		if ".BNC" == filepath.Ext(BNCPath) {
 
+			id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
+
 			commentsFromFab, errScraping := get_comments_from_file(BNCPath)
 
 			if errScraping == nil {
-				AppendCSV(logFileName, BNCPath, commentsFromFab)
+				AppendCSV(logFileName, BNCPath, id, commentsFromFab)
 			} else {
-				AppendCSV(logFileName, BNCPath, "READING ERROR")
+				AppendCSV(logFileName, BNCPath, id, "READING ERROR")
 			}
 		}
 	}
