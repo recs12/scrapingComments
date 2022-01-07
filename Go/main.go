@@ -85,34 +85,6 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 	//REMOVE THE QUOTATION MARKS
 	res := strings.ReplaceAll(fieldsWithoutAsteriks, "'", "")
 
-	/*
-	    [0]'Tabellenidentifikator'
-	    [1]'ID'
-	    [2]'Zeichnungsnummer'
-	    [3]'Bezeichnung'
-	    [4]'Variantenbezeichnung'
-	    [5]'Programmversion'
-	    [6]'Erstellungsdatum'
-	    [7]'Aenderungsdatum'
-	    [8]'Produktionsdatum'
-	    [9]'Bearbeiter'
-	    [10]'Klassifizierung'
-	   *[11]'Kommentar'
-	    [12]'Material'
-	    [13]'Blechdicke'
-	    [14]'Gewicht'
-	    [15]'UmschreibendesRechteckX'
-	    [16]'UmschreibendesRechteckY'
-	    [17]'Herkunft'
-	   *[18]'AnzahlBiegeschritte'
-	    [19]'ToPs-Programmname'
-	    [20]'Zuordnung VorschauID'
-	    [21]'Bearbeitungszeit'
-	    [22]'TeilabmessungX'
-	    [23]'TeilabmessungY'
-	    [24]'TeilabmessungZ'
-	*/
-
 	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(res, ",")
 	if len(fieldsSequence) > 18 {
@@ -122,7 +94,8 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 	}
 }
 
-func run() ([]string, error) {
+func main() {
+	start := time.Now()
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(SearchDir, func(path string, f os.FileInfo, err error) error {
@@ -153,12 +126,6 @@ func run() ([]string, error) {
 		}
 	}
 
-	return fileList, nil
-}
-
-func main() {
-	start := time.Now()
-	run()
 	elapsed := time.Since(start)
 	log.Printf("Scraping timer: %s", elapsed)
 	log.Printf("%s created.", LogFileName)
