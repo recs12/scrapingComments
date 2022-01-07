@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -60,7 +59,7 @@ func getContentBetween(content string, regx regexp.Regexp) string {
 	return modified_content
 }
 
-func get_comments_from_file(pathBNCFile string) (string, error) {
+func get_comments_from_file(pathBNCFile string, out chan<- string) {
 
 	fmt.Println(pathBNCFile)
 	//Get content of the BNCPath
@@ -87,15 +86,15 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 
 	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(res, ",")
-	if len(fieldsSequence) > 18 {
-		return strings.TrimSpace(fieldsSequence[18]), nil
-	} else {
-		return "READING ERROR", errors.New("reading error")
-	}
+
+	out <- strings.TrimSpace(fieldsSequence[18])
+
 }
 
 func main() {
 	start := time.Now()
+
+	out := make(chan string)
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(SearchDir, func(path string, f os.FileInfo, err error) error {
@@ -114,15 +113,17 @@ func main() {
 		// we filter only the .BNC files.
 		if ".BNC" == filepath.Ext(BNCPath) {
 
-			id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
+			// id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
 
-			commentsFromFab, errScraping := get_comments_from_file(BNCPath)
+			// commentsFromFab, errScraping := get_comments_from_file(BNCPath)
+			go get_comments_from_file(BNCPath, out)
 
-			if errScraping == nil {
-				appendCsv(LogFileName, BNCPath, id, commentsFromFab)
-			} else {
-				appendCsv(LogFileName, BNCPath, id, "READING ERROR")
-			}
+			// if errScraping == nil {
+			// 	appendCsv(LogFileName, BNCPath, id, commentsFromFab)
+			// } else {
+			// 	appendCsv(LogFileName, BNCPath, id, "READING ERROR")
+			// }
+			fmt.Println(<-out)
 		}
 	}
 
