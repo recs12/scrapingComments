@@ -59,8 +59,9 @@ func getContentBetween(content string, regx regexp.Regexp) string {
 	return modified_content
 }
 
-func get_comments_from_file(pathBNCFile string, out chan<- string) {
+func get_comments_from_file(in <-chan string, out chan<- string) {
 
+	pathBNCFile := <-in
 	fmt.Println(pathBNCFile)
 	//Get content of the BNCPath
 	content, err := ioutil.ReadFile(pathBNCFile)
@@ -95,6 +96,7 @@ func main() {
 	start := time.Now()
 
 	out := make(chan string)
+	in := make(chan string)
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(SearchDir, func(path string, f os.FileInfo, err error) error {
@@ -108,6 +110,7 @@ func main() {
 
 	createCsvAndHeaders(LogFileName)
 
+	//chunk the array here
 	for _, BNCPath := range fileList {
 
 		// we filter only the .BNC files.
@@ -116,8 +119,13 @@ func main() {
 			// id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
 
 			// commentsFromFab, errScraping := get_comments_from_file(BNCPath)
-			go get_comments_from_file(BNCPath, out)
+			go get_comments_from_file(in, out)
+			go get_comments_from_file(in, out)
 
+			go func() {
+				in <- BNCPath //chunk[0]
+				in <- BNCPath //chunk[1]
+			}()
 			// if errScraping == nil {
 			// 	appendCsv(LogFileName, BNCPath, id, commentsFromFab)
 			// } else {
