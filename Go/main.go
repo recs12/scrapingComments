@@ -14,11 +14,11 @@ import (
 var LogFileName string = "BNC.csv"
 
 //Linux:
-// var SearchDir string := "/home/r3s2/Documents/BNC/"
+var SearchDir string = "/home/r3s2/Documents/BNC/"
 
 //Windows
 // var SearchDir string := "C:\\Users\\recs\\Documents\\ACTIF"
-var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
+// var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 // Headers in csv files.
 var Headers string = "path, part_id, number_bends,\n"
@@ -92,6 +92,26 @@ func get_comments_from_file(in <-chan string, out chan<- string) {
 
 }
 
+func chunkSlice(slice []string, chunkSize int) [][]string {
+	var chunks [][]string
+	for {
+		if len(slice) == 0 {
+			break
+		}
+
+		// necessary check to avoid slicing beyond
+		// slice capacity
+		if len(slice) < chunkSize {
+			chunkSize = len(slice)
+		}
+
+		chunks = append(chunks, slice[0:chunkSize])
+		slice = slice[chunkSize:]
+	}
+
+	return chunks
+}
+
 func main() {
 	start := time.Now()
 
@@ -100,7 +120,10 @@ func main() {
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(SearchDir, func(path string, f os.FileInfo, err error) error {
-		fileList = append(fileList, path)
+		// we filter only the .BNC files.
+		if ".BNC" == filepath.Ext(path) {
+			fileList = append(fileList, path)
+		}
 		return err
 	})
 
@@ -110,29 +133,28 @@ func main() {
 
 	createCsvAndHeaders(LogFileName)
 
+	chunkedFileList := chunkSlice(fileList, 2)
+
 	//chunk the array here
-	for _, BNCPath := range fileList {
+	for _, BNCPath := range chunkedFileList {
 
-		// we filter only the .BNC files.
-		if ".BNC" == filepath.Ext(BNCPath) {
+		// id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
 
-			// id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
+		// commentsFromFab, errScraping := get_comments_from_file(BNCPath)
+		go get_comments_from_file(in, out)
+		go get_comments_from_file(in, out)
 
-			// commentsFromFab, errScraping := get_comments_from_file(BNCPath)
-			go get_comments_from_file(in, out)
-			go get_comments_from_file(in, out)
-
-			go func() {
-				in <- BNCPath //chunk[0]
-				in <- BNCPath //chunk[1]
-			}()
-			// if errScraping == nil {
-			// 	appendCsv(LogFileName, BNCPath, id, commentsFromFab)
-			// } else {
-			// 	appendCsv(LogFileName, BNCPath, id, "READING ERROR")
-			// }
-			fmt.Println(<-out)
-		}
+		go func() {
+			in <- BNCPath[0] //chunk[0]
+			in <- BNCPath[1] //chunk[1]
+		}()
+		// if errScraping == nil {
+		// 	appendCsv(LogFileName, BNCPath, id, commentsFromFab)
+		// } else {
+		// 	appendCsv(LogFileName, BNCPath, id, "READING ERROR")
+		// }
+		fmt.Println(<-out)
+		fmt.Println(<-out)
 	}
 
 	elapsed := time.Since(start)
