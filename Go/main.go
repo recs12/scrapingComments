@@ -112,6 +112,14 @@ func chunkSlice(slice []string, chunkSize int) [][]string {
 	return chunks
 }
 
+func appendFile(BNCPath string,id)  {
+		if errScraping == nil {
+		appendCsv(LogFileName, BNCPath, id, commentsFromFab)
+		} else {
+			appendCsv(LogFileName, BNCPath, id, "READING ERROR")
+		}
+}
+
 func main() {
 	start := time.Now()
 
@@ -148,11 +156,7 @@ func main() {
 			in <- BNCPath[0] //chunk[0]
 			in <- BNCPath[1] //chunk[1]
 		}()
-		// if errScraping == nil {
-		// 	appendCsv(LogFileName, BNCPath, id, commentsFromFab)
-		// } else {
-		// 	appendCsv(LogFileName, BNCPath, id, "READING ERROR")
-		// }
+
 		fmt.Println(<-out)
 		fmt.Println(<-out)
 	}
