@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,11 +14,11 @@ import (
 var LogFileName string = "BNC.csv"
 
 //Linux:
-// var SearchDir string := "/home/r3s2/Documents/BNC/"
+var SearchDir string = "/home/r3s2/Documents/BNC/"
 
 //Windows
 // var SearchDir string := "C:\\Users\\recs\\Documents\\ACTIF"
-var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
+// var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 // Headers in csv files.
 var Headers string = "path, part_id, number_bends,\n"
@@ -60,8 +59,9 @@ func getContentBetween(content string, regx regexp.Regexp) string {
 	return modified_content
 }
 
-func get_comments_from_file(pathBNCFile string) (string, error) {
+func get_comments_from_file(in <-chan string, out chan<- string) {
 
+	pathBNCFile := <-in
 	fmt.Println(pathBNCFile)
 	//Get content of the BNCPath
 	content, err := ioutil.ReadFile(pathBNCFile)
@@ -85,48 +85,53 @@ func get_comments_from_file(pathBNCFile string) (string, error) {
 	//REMOVE THE QUOTATION MARKS
 	res := strings.ReplaceAll(fieldsWithoutAsteriks, "'", "")
 
-	/*
-	    [0]'Tabellenidentifikator'
-	    [1]'ID'
-	    [2]'Zeichnungsnummer'
-	    [3]'Bezeichnung'
-	    [4]'Variantenbezeichnung'
-	    [5]'Programmversion'
-	    [6]'Erstellungsdatum'
-	    [7]'Aenderungsdatum'
-	    [8]'Produktionsdatum'
-	    [9]'Bearbeiter'
-	    [10]'Klassifizierung'
-	   *[11]'Kommentar'
-	    [12]'Material'
-	    [13]'Blechdicke'
-	    [14]'Gewicht'
-	    [15]'UmschreibendesRechteckX'
-	    [16]'UmschreibendesRechteckY'
-	    [17]'Herkunft'
-	   *[18]'AnzahlBiegeschritte'
-	    [19]'ToPs-Programmname'
-	    [20]'Zuordnung VorschauID'
-	    [21]'Bearbeitungszeit'
-	    [22]'TeilabmessungX'
-	    [23]'TeilabmessungY'
-	    [24]'TeilabmessungZ'
-	*/
-
 	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(res, ",")
-	if len(fieldsSequence) > 18 {
-		return strings.TrimSpace(fieldsSequence[18]), nil
-	} else {
-		return "READING ERROR", errors.New("reading error")
-	}
+
+	out <- strings.TrimSpace(fieldsSequence[18])
+
 }
 
-func run() ([]string, error) {
+func chunkSlice(slice []string, chunkSize int) [][]string {
+	var chunks [][]string
+	for {
+		if len(slice) == 0 {
+			break
+		}
+
+		// necessary check to avoid slicing beyond
+		// slice capacity
+		if len(slice) < chunkSize {
+			chunkSize = len(slice)
+		}
+
+		chunks = append(chunks, slice[0:chunkSize])
+		slice = slice[chunkSize:]
+	}
+
+	return chunks
+}
+
+func appendFile(BNCPath string,id)  {
+		if errScraping == nil {
+		appendCsv(LogFileName, BNCPath, id, commentsFromFab)
+		} else {
+			appendCsv(LogFileName, BNCPath, id, "READING ERROR")
+		}
+}
+
+func main() {
+	start := time.Now()
+
+	out := make(chan string)
+	in := make(chan string)
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(SearchDir, func(path string, f os.FileInfo, err error) error {
-		fileList = append(fileList, path)
+		// we filter only the .BNC files.
+		if ".BNC" == filepath.Ext(path) {
+			fileList = append(fileList, path)
+		}
 		return err
 	})
 
@@ -136,29 +141,26 @@ func run() ([]string, error) {
 
 	createCsvAndHeaders(LogFileName)
 
-	for _, BNCPath := range fileList {
+	chunkedFileList := chunkSlice(fileList, 2)
 
-		// we filter only the .BNC files.
-		if ".BNC" == filepath.Ext(BNCPath) {
+	//chunk the array here
+	for _, BNCPath := range chunkedFileList {
 
-			id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
+		// id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
 
-			commentsFromFab, errScraping := get_comments_from_file(BNCPath)
+		// commentsFromFab, errScraping := get_comments_from_file(BNCPath)
+		go get_comments_from_file(in, out)
+		go get_comments_from_file(in, out)
 
-			if errScraping == nil {
-				appendCsv(LogFileName, BNCPath, id, commentsFromFab)
-			} else {
-				appendCsv(LogFileName, BNCPath, id, "READING ERROR")
-			}
-		}
+		go func() {
+			in <- BNCPath[0] //chunk[0]
+			in <- BNCPath[1] //chunk[1]
+		}()
+
+		fmt.Println(<-out)
+		fmt.Println(<-out)
 	}
 
-	return fileList, nil
-}
-
-func main() {
-	start := time.Now()
-	run()
 	elapsed := time.Since(start)
 	log.Printf("Scraping timer: %s", elapsed)
 	log.Printf("%s created.", LogFileName)
