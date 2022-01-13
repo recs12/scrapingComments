@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,14 +15,15 @@ import (
 var LogFileName string = "BNC.csv"
 
 //Linux:
-var SearchDir string = "/home/r3s2/Documents/BNC/"
+// var SearchDir string = "/home/r3s2/Documents/BNC/"
 
 //Windows
-// var SearchDir string := "C:\\Users\\recs\\Documents\\ACTIF"
+var SearchDir string = "C:\\Users\\recs\\Documents\\ACTIF"
+
 // var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 // Headers in csv files.
-var Headers string = "path, part_id, number_bends,\n"
+var Headers string = "path, part_id, number_bends, time_for_bends, with_adapter_bnc,\n"
 
 // compile the regex patterns
 var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `([^"]*)` + "ENDE_BIEGETEILSTAMM")
@@ -36,7 +38,7 @@ func createCsvAndHeaders(fileName string) {
 	}
 }
 
-func appendCsv(fileName, path, id, datafield string) {
+func appendCsv(fileName, path, idNumber, bendsNumber, bendsTime, hasAdapter string) {
 
 	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -44,7 +46,7 @@ func appendCsv(fileName, path, id, datafield string) {
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + ", " + id + ", " + datafield + ",\n"); err != nil {
+	if _, err := file.WriteString(path + ", " + idNumber + ", " + bendsNumber + ", " + bendsTime + ", " + hasAdapter + ",\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -59,10 +61,28 @@ func getContentBetween(content string, regx regexp.Regexp) string {
 	return modified_content
 }
 
-func get_comments_from_file(in <-chan string, out chan<- string) {
+func findAdapterModufixInBnc(paragraph, element string) string {
+	i := strings.Contains(paragraph, element)
+	return strings.Title(strconv.FormatBool(i))
+}
+
+func TrimC(element string) string {
+	// 'if the last letter is a C remove the character
+	lc := strings.TrimSpace(element)
+	lc = lc[len(lc)-1:]
+	if lc == "C" {
+		return lc[:len(lc)-1]
+	} else {
+		return lc
+	}
+
+}
+
+func getCommentsFromFile(in <-chan string, out chan<- [3]string) {
 
 	pathBNCFile := <-in
 	fmt.Println(pathBNCFile)
+
 	//Get content of the BNCPath
 	content, err := ioutil.ReadFile(pathBNCFile)
 	if err != nil {
@@ -71,6 +91,10 @@ func get_comments_from_file(in <-chan string, out chan<- string) {
 
 	// Convert []byte to string and print to screen
 	textfromBNC := string(content)
+
+	// Check for Adapter
+	hasAdapter := findAdapterModufixInBnc(textfromBNC, "Adapter Modufix") //Check if with adapter.
+
 	biegeteilstamm := getContentBetween(textfromBNC, *TagsRegx)
 	fields := getContentBetween(biegeteilstamm, *TagsFields)
 	subFields := getContentBetween(fields, *TagsSubFields)
@@ -83,12 +107,22 @@ func get_comments_from_file(in <-chan string, out chan<- string) {
 	fieldsWithoutAsteriks := strings.Replace(fieldswhitoutCarriage, "*", "", -1)
 
 	//REMOVE THE QUOTATION MARKS
-	res := strings.ReplaceAll(fieldsWithoutAsteriks, "'", "")
+	fieldsWithoutQuotes := strings.ReplaceAll(fieldsWithoutAsteriks, "'", "")
 
 	//SPLIT TO ARRAY
-	fieldsSequence := strings.Split(res, ",")
+	fieldsSequence := strings.Split(fieldsWithoutQuotes, ",")
+	var colData [3]string
+	if len(fieldsSequence) > 21 {
+		colData[0] = strings.TrimSpace(fieldsSequence[18])
+		colData[1] = strings.TrimSpace(TrimC(fieldsSequence[21]))
+		colData[2] = hasAdapter //Capitalize false -> False
 
-	out <- strings.TrimSpace(fieldsSequence[18])
+	} else {
+		colData[0] = "error reading"
+		colData[1] = "error reading"
+		colData[2] = "error reading"
+	}
+	out <- colData
 
 }
 
@@ -112,24 +146,32 @@ func chunkSlice(slice []string, chunkSize int) [][]string {
 	return chunks
 }
 
-func appendFile(BNCPath string,id)  {
-		if errScraping == nil {
-		appendCsv(LogFileName, BNCPath, id, commentsFromFab)
-		} else {
-			appendCsv(LogFileName, BNCPath, id, "READING ERROR")
-		}
+func FilenameWithoutExtension(fn string) string {
+
+	return strings.TrimSuffix(filepath.Base(fn), ".BNC")
+}
+
+func appendFile(logFile string, filePath string, data [3]string) {
+	// get basename
+	idNumber := FilenameWithoutExtension(filePath)
+
+	if "error reading" != "" {
+		appendCsv(logFile, filePath, idNumber, data[0], data[1], data[2])
+	} else {
+		appendCsv(logFile, filePath, idNumber, "error", "error", "error")
+	}
 }
 
 func main() {
 	start := time.Now()
 
-	out := make(chan string)
+	out := make(chan [3]string)
 	in := make(chan string)
 
 	fileList := make([]string, 0)
 	e := filepath.Walk(SearchDir, func(path string, f os.FileInfo, err error) error {
 		// we filter only the .BNC files.
-		if ".BNC" == filepath.Ext(path) {
+		if filepath.Ext(path) == ".BNC" {
 			fileList = append(fileList, path)
 		}
 		return err
@@ -141,24 +183,25 @@ func main() {
 
 	createCsvAndHeaders(LogFileName)
 
-	chunkedFileList := chunkSlice(fileList, 2)
+	chunkedFileList := chunkSlice(fileList, 3)
 
 	//chunk the array here
 	for _, BNCPath := range chunkedFileList {
 
-		// id := strings.TrimSuffix(filepath.Base(BNCPath), ".BNC")
-
-		// commentsFromFab, errScraping := get_comments_from_file(BNCPath)
-		go get_comments_from_file(in, out)
-		go get_comments_from_file(in, out)
+		// commentsFromFab, errScraping := getCommentsFromFile(BNCPath)
+		go getCommentsFromFile(in, out)
+		go getCommentsFromFile(in, out)
+		go getCommentsFromFile(in, out)
 
 		go func() {
 			in <- BNCPath[0] //chunk[0]
 			in <- BNCPath[1] //chunk[1]
+			in <- BNCPath[2] //chunk[1]
 		}()
 
-		fmt.Println(<-out)
-		fmt.Println(<-out)
+		appendFile(LogFileName, BNCPath[0], <-out)
+		appendFile(LogFileName, BNCPath[1], <-out)
+		appendFile(LogFileName, BNCPath[2], <-out)
 	}
 
 	elapsed := time.Since(start)
