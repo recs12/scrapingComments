@@ -23,7 +23,7 @@ var SearchDir string = "C:\\Users\\recs\\Documents\\ACTIF"
 // var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 // Headers in csv files.
-var Headers string = "path, part_id, number_bends, time_for_bends, with_adapter_bnc,\n"
+var Headers string = "path; part_id; number_bends; time_for_bends; with_adapter_bnc;\n"
 
 // compile the regex patterns
 var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `([^"]*)` + "ENDE_BIEGETEILSTAMM")
@@ -46,7 +46,7 @@ func appendCsv(fileName, path, idNumber, bendsNumber, bendsTime, hasAdapter stri
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + ", " + idNumber + ", " + bendsNumber + ", " + bendsTime + ", " + hasAdapter + ",\n"); err != nil {
+	if _, err := file.WriteString(path + "; " + idNumber + "; " + bendsNumber + "; " + bendsTime + "; " + hasAdapter + ";\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -66,24 +66,24 @@ func findAdapterModufixInBnc(paragraph, element string) string {
 	return strings.Title(strconv.FormatBool(i))
 }
 
-func TrimC(element string) string {
+func TrimCR(element string) string {
 	// 'if the last letter is a C remove the character
-	lc := strings.TrimSpace(element)
-	lc = lc[len(lc)-1:]
-	if lc == "C" {
-		return lc[:len(lc)-1]
+	element2 := strings.TrimSpace(element)
+	letter := element2[len(element2)-1:]
+
+	if letter == "C" {
+		return element2[:len(element2)-1]
 	} else {
-		return lc
+		return element2
 	}
 
 }
 
-func getCommentsFromFile(in <-chan string, out chan<- [3]string) {
+func getCommentsFromFile(pathBNCFile string) [3]string {
 
-	pathBNCFile := <-in
 	fmt.Println(pathBNCFile)
 
-	//Get content of the BNCPath
+	//Get content of the bncPath
 	content, err := ioutil.ReadFile(pathBNCFile)
 	if err != nil {
 		log.Fatal(err)
@@ -112,38 +112,18 @@ func getCommentsFromFile(in <-chan string, out chan<- [3]string) {
 	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(fieldsWithoutQuotes, ",")
 	var colData [3]string
-	if len(fieldsSequence) > 21 {
+	if len(fieldsSequence) > 18 {
 		colData[0] = strings.TrimSpace(fieldsSequence[18])
-		colData[1] = strings.TrimSpace(TrimC(fieldsSequence[21]))
-		colData[2] = hasAdapter //Capitalize false -> False
+		colData[1] = strings.TrimSpace(TrimCR(fieldsSequence[21]))
+		colData[2] = hasAdapter
 
 	} else {
-		colData[0] = "error reading"
-		colData[1] = "error reading"
-		colData[2] = "error reading"
+		colData[0] = "FAILED"
+		colData[1] = "FAILED"
+		colData[2] = "FAILED"
 	}
-	out <- colData
+	return colData
 
-}
-
-func chunkSlice(slice []string, chunkSize int) [][]string {
-	var chunks [][]string
-	for {
-		if len(slice) == 0 {
-			break
-		}
-
-		// necessary check to avoid slicing beyond
-		// slice capacity
-		if len(slice) < chunkSize {
-			chunkSize = len(slice)
-		}
-
-		chunks = append(chunks, slice[0:chunkSize])
-		slice = slice[chunkSize:]
-	}
-
-	return chunks
 }
 
 func FilenameWithoutExtension(fn string) string {
@@ -165,9 +145,6 @@ func appendFile(logFile string, filePath string, data [3]string) {
 func main() {
 	start := time.Now()
 
-	out := make(chan [3]string)
-	in := make(chan string)
-
 	fileList := make([]string, 0)
 	e := filepath.Walk(SearchDir, func(path string, f os.FileInfo, err error) error {
 		// we filter only the .BNC files.
@@ -183,25 +160,13 @@ func main() {
 
 	createCsvAndHeaders(LogFileName)
 
-	chunkedFileList := chunkSlice(fileList, 3)
-
 	//chunk the array here
-	for _, BNCPath := range chunkedFileList {
+	for _, bncPath := range fileList {
 
-		// commentsFromFab, errScraping := getCommentsFromFile(BNCPath)
-		go getCommentsFromFile(in, out)
-		go getCommentsFromFile(in, out)
-		go getCommentsFromFile(in, out)
+		// commentsFromFab, errScraping := getCommentsFromFile(bncPath)
+		bendData := getCommentsFromFile(bncPath)
+		appendFile(LogFileName, bncPath, bendData)
 
-		go func() {
-			in <- BNCPath[0] //chunk[0]
-			in <- BNCPath[1] //chunk[1]
-			in <- BNCPath[2] //chunk[1]
-		}()
-
-		appendFile(LogFileName, BNCPath[0], <-out)
-		appendFile(LogFileName, BNCPath[1], <-out)
-		appendFile(LogFileName, BNCPath[2], <-out)
 	}
 
 	elapsed := time.Since(start)
