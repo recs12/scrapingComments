@@ -15,27 +15,18 @@ import (
 
 var LogFileName string = "BNC.csv"
 
-//Linux:
-// var SearchDir string = "/home/r3s2/Documents/BNC/"
-
 //Windows
 var SearchDir string = "C:\\Users\\recs\\Documents\\ACTIF"
-
-// var SearchDir string = "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\scrapingComments\\Go\\bug"
 
 // var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 // Headers in csv files.
-var Headers string = "path; part_id; number_bends; time_for_bends; with_adapter_bnc;\n"
+var Headers string = "path;part_id;number_bends;time_for_bends;with_adapter_bnc;\n"
 
 // compile the regex patterns
-// patternfieldsOfData = r"^BEGIN_BIEGETEILSTAMM$(.|\n)*ZA,DA,1\nDA,(((.|\n)*)\d{1,2}$)(.|\n)*(^C$\s)*^ENDE_BIEGETEILSTAMM$"
-// var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `((.|\n)*)` + "ENDE_BIEGETEILSTAMM")
-// var TagsFields *regexp.Regexp = regexp.MustCompile("ZA,DA,1\nDA" + `((.|\n)*)` + `(^C$\s)*`)
-// var TagsSubFields *regexp.Regexp = regexp.MustCompile("DA," + `((.|\n)*)` + `\z`) // from DA to the end of the file.
 var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `((.|\n)*)` + "ENDE_BIEGETEILSTAMM")
 var TagsFields *regexp.Regexp = regexp.MustCompile("ZA,DA,1" + `((.|\n)*)` + `(^C$\s)*`)
-var TagsSubFields *regexp.Regexp = regexp.MustCompile("DA," + `((.|\n)*)` + `\z`) // from DA to the end of the file.
+var TagsSubFields *regexp.Regexp = regexp.MustCompile("DA," + `((.|\n)*\d{1,2})` + `(.|\n)*`) // from DA to the end of the file.
 
 func createCsvAndHeaders(fileName string) {
 	// Create a csv file in the same location of the script.
@@ -68,11 +59,13 @@ func getContentBetween(content string, regx regexp.Regexp) string {
 	return modified_content
 }
 
+// return 0 or 1
 func findAdapterModufixInBnc(paragraph, element string) string {
 	i := strings.Contains(paragraph, element)
 	return strings.Title(strconv.FormatBool(i))
 }
 
+//with regex function this can be deleted.
 func TrimCR(element string) string {
 	// 'if the last letter is a C remove the character
 	if element != "" {
