@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -20,15 +21,21 @@ var LogFileName string = "BNC.csv"
 //Windows
 var SearchDir string = "C:\\Users\\recs\\Documents\\ACTIF"
 
+// var SearchDir string = "C:\\Users\\recs\\OneDrive - Premier Tech\\Documents\\PT\\cmf\\scrapingComments\\Go\\bug"
+
 // var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 // Headers in csv files.
 var Headers string = "path; part_id; number_bends; time_for_bends; with_adapter_bnc;\n"
 
 // compile the regex patterns
-var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `([^"]*)` + "ENDE_BIEGETEILSTAMM")
-var TagsFields *regexp.Regexp = regexp.MustCompile("ZA,DA,1" + `([^"]*)` + "C")
-var TagsSubFields *regexp.Regexp = regexp.MustCompile("DA," + `([^"]*)` + `\z`) // from DA to the end of the file.
+// patternfieldsOfData = r"^BEGIN_BIEGETEILSTAMM$(.|\n)*ZA,DA,1\nDA,(((.|\n)*)\d{1,2}$)(.|\n)*(^C$\s)*^ENDE_BIEGETEILSTAMM$"
+// var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `((.|\n)*)` + "ENDE_BIEGETEILSTAMM")
+// var TagsFields *regexp.Regexp = regexp.MustCompile("ZA,DA,1\nDA" + `((.|\n)*)` + `(^C$\s)*`)
+// var TagsSubFields *regexp.Regexp = regexp.MustCompile("DA," + `((.|\n)*)` + `\z`) // from DA to the end of the file.
+var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `((.|\n)*)` + "ENDE_BIEGETEILSTAMM")
+var TagsFields *regexp.Regexp = regexp.MustCompile("ZA,DA,1" + `((.|\n)*)` + `(^C$\s)*`)
+var TagsSubFields *regexp.Regexp = regexp.MustCompile("DA," + `((.|\n)*)` + `\z`) // from DA to the end of the file.
 
 func createCsvAndHeaders(fileName string) {
 	// Create a csv file in the same location of the script.
@@ -68,18 +75,22 @@ func findAdapterModufixInBnc(paragraph, element string) string {
 
 func TrimCR(element string) string {
 	// 'if the last letter is a C remove the character
-	element2 := strings.TrimSpace(element)
-	letter := element2[len(element2)-1:]
+	if element != "" {
+		element2 := strings.TrimSpace(element)
+		letter := element2[len(element2)-1:]
 
-	if letter == "C" {
-		return element2[:len(element2)-1]
+		if letter == "C" {
+			return element2[:len(element2)-1]
+		} else {
+			return element2
+		}
 	} else {
-		return element2
+		return ""
 	}
 
 }
 
-func getCommentsFromFile(pathBNCFile string) [3]string {
+func getCommentsFromFile(pathBNCFile string) ([3]string, error) {
 
 	fmt.Println(pathBNCFile)
 
@@ -116,30 +127,22 @@ func getCommentsFromFile(pathBNCFile string) [3]string {
 		colData[0] = strings.TrimSpace(fieldsSequence[18])
 		colData[1] = strings.TrimSpace(TrimCR(fieldsSequence[21]))
 		colData[2] = hasAdapter
+		return colData, nil
 
 	} else {
-		colData[0] = "FAILED"
-		colData[1] = "FAILED"
-		colData[2] = "FAILED"
+		return colData, errors.New("no data could scraped from this file")
 	}
-	return colData
 
 }
 
 func FilenameWithoutExtension(fn string) string {
-
 	return strings.TrimSuffix(filepath.Base(fn), ".BNC")
 }
 
 func appendFile(logFile string, filePath string, data [3]string) {
 	// get basename
 	idNumber := FilenameWithoutExtension(filePath)
-
-	if "error reading" != "" {
-		appendCsv(logFile, filePath, idNumber, data[0], data[1], data[2])
-	} else {
-		appendCsv(logFile, filePath, idNumber, "error", "error", "error")
-	}
+	appendCsv(logFile, filePath, idNumber, data[0], data[1], data[2])
 }
 
 func main() {
@@ -160,12 +163,16 @@ func main() {
 
 	createCsvAndHeaders(LogFileName)
 
-	//chunk the array here
 	for _, bncPath := range fileList {
 
-		// commentsFromFab, errScraping := getCommentsFromFile(bncPath)
-		bendData := getCommentsFromFile(bncPath)
-		appendFile(LogFileName, bncPath, bendData)
+		bendData, err := getCommentsFromFile(bncPath)
+		if err != nil {
+			appendFile(LogFileName, bncPath, [3]string{"FAILED", "FAILED", "FAILED"})
+		} else if bendData[1] == "" {
+			appendFile(LogFileName, bncPath, [3]string{"FAILED", "FAILED", "FAILED"})
+		} else {
+			appendFile(LogFileName, bncPath, bendData)
+		}
 
 	}
 
