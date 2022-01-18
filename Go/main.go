@@ -44,7 +44,7 @@ func appendCsv(fileName, path, idNumber, bendsNumber, bendsTime, hasAdapter stri
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + "; " + idNumber + "; " + bendsNumber + "; " + bendsTime + "; " + hasAdapter + ";\n"); err != nil {
+	if _, err := file.WriteString(path + ";" + idNumber + ";" + bendsNumber + ";" + bendsTime + ";" + hasAdapter + ";\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -59,28 +59,9 @@ func getContentBetween(content string, regx regexp.Regexp) string {
 	return modified_content
 }
 
-// return 0 or 1
 func findAdapterModufixInBnc(paragraph, element string) string {
 	i := strings.Contains(paragraph, element)
-	return strings.Title(strconv.FormatBool(i))
-}
-
-//with regex function this can be deleted.
-func TrimCR(element string) string {
-	// 'if the last letter is a C remove the character
-	if element != "" {
-		element2 := strings.TrimSpace(element)
-		letter := element2[len(element2)-1:]
-
-		if letter == "C" {
-			return element2[:len(element2)-1]
-		} else {
-			return element2
-		}
-	} else {
-		return ""
-	}
-
+	return strconv.FormatBool(i)
 }
 
 func getCommentsFromFile(pathBNCFile string) ([3]string, error) {
@@ -110,15 +91,20 @@ func getCommentsFromFile(pathBNCFile string) ([3]string, error) {
 	//ASTERISK
 	fieldsWithoutAsteriks := strings.Replace(fieldswhitoutCarriage, "*", "", -1)
 
-	//REMOVE THE QUOTATION MARKS
-	fieldsWithoutQuotes := strings.ReplaceAll(fieldsWithoutAsteriks, "'", "")
+	//ASTERISK
+	fieldsSepCleaned := strings.Replace(fieldsWithoutAsteriks, "*", "", -1)
+
+	//CLEANING QUOTATION MARKS & COMMA
+	fieldsSepCleaned2 := strings.ReplaceAll(fieldsSepCleaned, "',  '", "','")
+
+	fieldsSepCleaned3 := strings.ReplaceAll(fieldsSepCleaned2, ",  ", ",")
 
 	//SPLIT TO ARRAY
-	fieldsSequence := strings.Split(fieldsWithoutQuotes, ",")
+	fieldsSequence := strings.Split(fieldsSepCleaned3, ",")
 	var colData [3]string
 	if len(fieldsSequence) > 18 {
 		colData[0] = strings.TrimSpace(fieldsSequence[18])
-		colData[1] = strings.TrimSpace(TrimCR(fieldsSequence[21]))
+		colData[1] = strings.TrimSpace(fieldsSequence[21])
 		colData[2] = hasAdapter
 		return colData, nil
 
