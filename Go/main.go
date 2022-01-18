@@ -146,6 +146,11 @@ func appendFile(logFile string, filePath string, data [3]string) {
 }
 
 func main() {
+	LogFileName := os.Args[1]
+	SearchDir := os.Args[2]
+
+	fmt.Println(LogFileName)
+	fmt.Println(SearchDir)
 	start := time.Now()
 
 	fileList := make([]string, 0)
@@ -164,12 +169,10 @@ func main() {
 	createCsvAndHeaders(LogFileName)
 
 	for _, bncPath := range fileList {
-
+		// skip files that are unvalide because of the commas in the comments
 		bendData, err := getCommentsFromFile(bncPath)
-		if err != nil {
-			appendFile(LogFileName, bncPath, [3]string{"FAILED", "FAILED", "FAILED"})
-		} else if bendData[1] == "" {
-			appendFile(LogFileName, bncPath, [3]string{"FAILED", "FAILED", "FAILED"})
+		if err != nil || bendData[1] == "" {
+			appendFile(LogFileName, bncPath, [3]string{"scraping failed", "scraping failed", "scraping failed"})
 		} else {
 			appendFile(LogFileName, bncPath, bendData)
 		}
