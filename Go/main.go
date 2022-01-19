@@ -21,7 +21,7 @@ var SearchDir string = "C:\\Users\\recs\\Documents\\ACTIF"
 // var SearchDir string = "C:\\Users\\recs\\Documents\\ARCHIVE"
 
 // Headers in csv files.
-var Headers string = "path;part_id;number_bends;time_for_bends;with_adapter_bnc;\n"
+var Headers string = "path;part_id;number_bends;time_for_bends;with_adapter_bnc;comments\n"
 
 // compile the regex patterns
 var TagsRegx *regexp.Regexp = regexp.MustCompile("BEGIN_BIEGETEILSTAMM" + `((.|\n)*)` + "ENDE_BIEGETEILSTAMM")
@@ -37,7 +37,7 @@ func createCsvAndHeaders(fileName string) {
 	}
 }
 
-func appendCsv(fileName, path, idNumber, bendsNumber, bendsTime, hasAdapter string) {
+func appendCsv(fileName, path, idNumber, bendsNumber, bendsTime, hasAdapter, comments string) {
 
 	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -45,7 +45,7 @@ func appendCsv(fileName, path, idNumber, bendsNumber, bendsTime, hasAdapter stri
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + ";" + idNumber + ";" + bendsNumber + ";" + bendsTime + ";" + hasAdapter + ";\n"); err != nil {
+	if _, err := file.WriteString(path + ";" + idNumber + ";" + bendsNumber + ";" + bendsTime + ";" + hasAdapter + ";" + comments + ";\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -65,7 +65,7 @@ func findAdapterModufixInBnc(text, keyWord string) string {
 	return strconv.FormatBool(isAdapter)
 }
 
-func getCommentsFromFile(pathBNCFile string) ([3]string, error) {
+func getFieldsFromBNC(pathBNCFile string) ([4]string, error) {
 
 	fmt.Println(pathBNCFile)
 
@@ -86,11 +86,11 @@ func getCommentsFromFile(pathBNCFile string) ([3]string, error) {
 	subFields := getContentBetween(fields, *TagsSubFields)
 
 	//CARRIAGES:
-	regx := regexp.MustCompile("\n")
-	fieldswhitoutCarriage := regx.ReplaceAllString(subFields, "")
+	fieldswhitoutCarriage := strings.Replace(subFields, "\r", "", -1)
+	fieldswhitoutNewLine := strings.Replace(fieldswhitoutCarriage, "\n", "", -1)
 
 	//ASTERISK
-	fieldsWithoutAsteriks := strings.Replace(fieldswhitoutCarriage, "*", "", -1)
+	fieldsWithoutAsteriks := strings.Replace(fieldswhitoutNewLine, "*", "", -1)
 
 	//ASTERISK
 	fieldsSepCleaned := strings.Replace(fieldsWithoutAsteriks, "*", "", -1)
@@ -100,21 +100,22 @@ func getCommentsFromFile(pathBNCFile string) ([3]string, error) {
 	fieldsSepCleaned3 := strings.ReplaceAll(fieldsSepCleaned2, ",  ", ",")
 
 	//REMOVE COMMA FROM COMMENTS
-	withoutCommaInComment := commas.ReplaceAllString(fieldsSepCleaned3, "$1")
+	withoutCommaInComments := commas.ReplaceAllString(fieldsSepCleaned3, " comma ")
 
 	//SPLIT TO ARRAY
-	fieldsSequence := strings.Split(withoutCommaInComment, ",")
+	fieldsSequence := strings.Split(withoutCommaInComments, ",")
 
 	var sequence []string
 	for _, i := range fieldsSequence {
 		sequence = append(sequence, strings.TrimSpace(i))
 	}
 
-	var colData [3]string
+	var colData [4]string
 	if len(sequence) > 18 {
 		colData[0] = strings.TrimSpace(sequence[18])
 		colData[1] = strings.TrimSpace(sequence[21])
 		colData[2] = hasAdapter
+		colData[3] = strings.Replace(sequence[11], "\n", "", -1) // remove new lines
 		return colData, nil
 
 	} else {
@@ -127,10 +128,10 @@ func FilenameWithoutExtension(fn string) string {
 	return strings.TrimSuffix(filepath.Base(fn), ".BNC")
 }
 
-func appendFile(logFile string, filePath string, data [3]string) {
+func appendFile(logFile string, filePath string, data [4]string) {
 	// get basename
 	idNumber := FilenameWithoutExtension(filePath)
-	appendCsv(logFile, filePath, idNumber, data[0], data[1], data[2])
+	appendCsv(logFile, filePath, idNumber, data[0], data[1], data[2], data[3])
 }
 
 func main() {
@@ -158,9 +159,9 @@ func main() {
 
 	for _, bncPath := range fileList {
 		// skip files that are unvalide because of the commas in the comments
-		bendData, err := getCommentsFromFile(bncPath)
+		bendData, err := getFieldsFromBNC(bncPath)
 		if err != nil || bendData[1] == "" {
-			appendFile(LogFileName, bncPath, [3]string{"failed", "failed", "failed"})
+			appendFile(LogFileName, bncPath, [4]string{"failed", "failed", "failed", "failed"})
 		} else {
 			appendFile(LogFileName, bncPath, bendData)
 		}
