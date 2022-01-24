@@ -45,7 +45,7 @@ func appendCsv(fileName, path, idNumber, bendsNumber, bendsTime, hasAdapter, com
 	}
 
 	defer file.Close()
-	if _, err := file.WriteString(path + ";" + idNumber + ";" + bendsNumber + ";" + bendsTime + ";" + hasAdapter + ";" + comments + ";\n"); err != nil {
+	if _, err := file.WriteString(path + ";" + idNumber + ";" + bendsNumber + ";" + bendsTime + ";" + hasAdapter + ";" + comments + "\n"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -100,7 +100,7 @@ func getFieldsFromBNC(pathBNCFile string) ([4]string, error) {
 	fieldsSepCleaned3 := strings.ReplaceAll(fieldsSepCleaned2, ",  ", ",")
 
 	//REMOVE COMMA FROM COMMENTS
-	withoutCommaInComments := commas.ReplaceAllString(fieldsSepCleaned3, " comma ")
+	withoutCommaInComments := commas.ReplaceAllString(fieldsSepCleaned3, " virgule ")
 
 	//SPLIT TO ARRAY
 	fieldsSequence := strings.Split(withoutCommaInComments, ",")
@@ -115,7 +115,8 @@ func getFieldsFromBNC(pathBNCFile string) ([4]string, error) {
 		colData[0] = strings.TrimSpace(sequence[18])
 		colData[1] = strings.TrimSpace(sequence[21])
 		colData[2] = hasAdapter
-		colData[3] = strings.Replace(sequence[11], "\n", "", -1) // remove new lines
+		commentWithoutNewLine := strings.Replace(sequence[11], "\n", "", -1)            // remove new lines
+		colData[3] = strings.Replace(commentWithoutNewLine, ";", " point-virgule ", -1) // remove new lines
 		return colData, nil
 
 	} else {
